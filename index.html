@@ -87,6 +87,9 @@
     border-bottom:16px solid var(--red); filter:drop-shadow(0 0 2px #fff); }
   #keysHelp { position:absolute; left:50%; bottom:12px; transform:translateX(-50%); background:#f4e8cce6; border:1px solid var(--ink);
     border-radius:4px; padding:4px 12px; font-style:italic; font-size:14px; white-space:nowrap; }
+  #say { position:absolute; display:none; transform:translate(-50%, -100%); max-width:260px; padding:8px 12px; pointer-events:none;
+    background:var(--paper); border:2px solid var(--ink); border-radius:14px; font-style:italic; font-size:16px; line-height:1.25; box-shadow:0 6px 18px #0006; }
+  #say::after { content:""; position:absolute; left:50%; bottom:-10px; margin-left:-8px; border:8px solid transparent; border-top-color:var(--ink); border-bottom:0; }
   #pad { position:absolute; right:16px; bottom:16px; display:none; grid-template-columns:repeat(3, 52px); gap:6px; }
   #pad button { height:52px; font-size:22px; border-radius:50%; border:2px solid var(--ink); background:#f4e8cce6; color:var(--ink); touch-action:none; }
   @media (pointer:coarse) { #pad { display:grid; } }
@@ -103,8 +106,9 @@
 
 <div id="view3d">
   <button id="exit3d">🗺 Back to the map</button>
-  <div id="keysHelp">WASD / arrows to walk · drag to look · click the ground to go there · Shift to run · Esc for the map</div>
+  <div id="keysHelp">WASD / arrows to walk · drag to look · click the ground to go there · Shift to run · walk up to people to hear them · Esc for the map</div>
   <div id="mini"><div id="miniDot"></div></div>
+  <div id="say"></div>
   <div id="pad">
     <span></span><button data-k="KeyW">▲</button><span></span>
     <button data-k="ArrowLeft">↶</button><button data-k="KeyS">▼</button><button data-k="ArrowRight">↷</button>
