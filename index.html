@@ -1,28 +1,238 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Practice</title>
-  <style>
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #fafafa;
-      color: #111;
-    }
-    .card { text-align: center; padding: 2rem; }
-    h1 { font-size: 2.5rem; margin: 0 0 .5rem; }
-    p { color: #666; margin: 0; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Walk Through Cambridge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#3b2412; --paper:#f4e8cc; --red:#b3261e; --gold:#c89b3c; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#2a1d12; color:var(--ink);
+    font-family:"IM Fell English", Georgia, "Times New Roman", serif; }
+  #stage { position:absolute; inset:0; display:grid; place-items:center; }
+  #map { position:relative; aspect-ratio:1920/1427; width:min(100vw, calc(100vh * 1920 / 1427));
+    background:url(map.jpg) center/100% 100% no-repeat; box-shadow:0 10px 60px #000a; cursor:crosshair;
+    touch-action:manipulation; user-select:none; -webkit-user-select:none; }
+
+  .place { position:absolute; transform:translate(-50%,-50%); cursor:pointer; }
+  .place .dot { width:14px; height:14px; border-radius:50%; background:var(--gold);
+    border:2px solid var(--paper); box-shadow:0 0 0 2px var(--ink), 0 2px 6px #0008; transition:transform .2s; }
+  .place:hover .dot, .place.near .dot { transform:scale(1.35); background:#fff3c4; }
+  .place .label { position:absolute; left:50%; top:16px; transform:translateX(-50%); white-space:nowrap;
+    font-family:"IM Fell English SC", Georgia, serif; font-size:clamp(10px, 1.1vw, 15px);
+    background:#f4e8ccee; padding:1px 7px; border:1px solid var(--ink); border-radius:3px; pointer-events:none; }
+  .place.star .dot { background:var(--red); }
+  .place .ev { position:absolute; right:-6px; top:-6px; width:10px; height:10px; border-radius:50%;
+    background:var(--red); animation:pulse 1.6s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 #b3261eaa} 70%{box-shadow:0 0 0 12px #b3261e00} 100%{box-shadow:0 0 0 0 #b3261e00} }
+
+  #walker { position:absolute; left:40%; top:78%; transform:translate(-50%,-85%); font-size:clamp(24px, 2.6vw, 40px);
+    transition-property:left, top; transition-timing-function:linear; pointer-events:none; z-index:5;
+    filter:drop-shadow(0 3px 2px #0007); }
+  #walker span { display:inline-block; }
+  #walker.flip span { transform:scaleX(-1); }
+  #walker.walking span { animation:bob .35s infinite alternate ease-in-out; }
+  #walker.flip.walking span { animation-name:bobf; }
+  @keyframes bob  { from{transform:translateY(0) rotate(-4deg)} to{transform:translateY(-4px) rotate(4deg)} }
+  @keyframes bobf { from{transform:scaleX(-1) translateY(0) rotate(-4deg)} to{transform:scaleX(-1) translateY(-4px) rotate(4deg)} }
+  #target { position:absolute; width:18px; height:18px; margin:-9px 0 0 -9px; border:2px dashed var(--red);
+    border-radius:50%; pointer-events:none; opacity:0; transition:opacity .3s; }
+
+  .panel { background:var(--paper); border:2px solid var(--ink); box-shadow:0 0 0 4px var(--paper), 0 0 0 6px var(--red), 0 12px 40px #000c; }
+  #card { position:fixed; left:50%; bottom:16px; width:min(560px, calc(100vw - 24px)); max-height:55vh; overflow:auto;
+    transform:translate(-50%, calc(100% + 90px)); transition:transform .45s cubic-bezier(.2,.9,.3,1.2); padding:16px 20px 14px; z-index:10; }
+  #card.open { transform:translate(-50%, 0); }
+  #card h2 { margin:0 28px 2px 0; font-family:"IM Fell English SC", Georgia, serif; font-size:26px; font-weight:normal; color:var(--red); }
+  #card .sub { font-style:italic; opacity:.75; margin:0 0 8px; }
+  #card p { margin:0 0 10px; font-size:17px; line-height:1.35; }
+  #card h3 { margin:12px 0 6px; font-size:15px; letter-spacing:.08em; text-transform:uppercase; border-top:1px solid #3b241255; padding-top:10px; }
+  .close { position:absolute; right:10px; top:6px; background:none; border:0; font-size:28px; cursor:pointer; color:var(--ink); line-height:1; }
+
+  .evt { display:block; padding:6px 0; color:var(--ink); text-decoration:none; border-bottom:1px dotted #3b241244; }
+  .evt:last-child { border-bottom:0; }
+  .evt b { color:var(--red); font-weight:normal; margin-right:6px; white-space:nowrap; }
+  .evt small { display:block; opacity:.7; font-style:italic; }
+  a.evt:hover { background:#e9d7ad; }
+
+  #evBtn { position:fixed; top:12px; right:12px; z-index:11; font:inherit; font-size:18px; padding:6px 14px; cursor:pointer;
+    background:var(--red); color:var(--paper); border:2px solid var(--paper); border-radius:4px; box-shadow:0 4px 14px #0009; }
+  #evBtn .n { background:var(--paper); color:var(--red); border-radius:10px; padding:0 7px; margin-left:6px; font-size:14px; }
+  #events { position:fixed; top:60px; right:12px; width:min(380px, calc(100vw - 24px)); max-height:calc(100vh - 80px); overflow:auto;
+    padding:14px 18px; z-index:11; display:none; }
+  #events.open { display:block; }
+  #events h2 { margin:0 0 6px; font-family:"IM Fell English SC", Georgia, serif; font-weight:normal; color:var(--red); }
+  #events .evt { cursor:pointer; }
+  #events .evt:hover { background:#e9d7ad; }
+
+  #hint { position:fixed; top:12px; left:12px; z-index:9; background:#f4e8cce6; padding:6px 12px; border:1px solid var(--ink);
+    border-radius:4px; font-style:italic; transition:opacity 1s; max-width:calc(100vw - 180px); }
+  #credit { position:fixed; right:8px; bottom:4px; font-size:11px; color:#f4e8ccaa; z-index:1; }
+  #credit a { color:inherit; }
+</style>
 </head>
 <body>
-  <div class="card">
-    <h1>Работает!</h1>
-    <p>Первая страница Andrey, опубликованная через GitHub и Vercel.</p>
+<div id="stage">
+  <div id="map">
+    <div id="target"></div>
+    <div id="walker"><span>🚶</span></div>
   </div>
+</div>
+
+<div id="hint">Click anywhere on the map to take a stroll through Cambridge, 1575</div>
+<button id="evBtn">Events <span class="n" id="evCount">0</span></button>
+<div id="events" class="panel"></div>
+<div id="card" class="panel"><button class="close" aria-label="Close">×</button><div id="cardBody"></div></div>
+<div id="credit">Map: Braun &amp; Hogenberg, <i>Cantebrigia</i>, 1575 · <a href="https://commons.wikimedia.org/wiki/File:Cambridge_by_Braun_Hogenberg_(110198041).jpg" target="_blank">Wikimedia Commons</a></div>
+
+<script>
+// ===== Places. Coordinates are % of the image (Alt+click on the map logs them to the console) =====
+const PLACES = [
+  { id:"cjbs", name:"Cambridge Judge Business School", short:"CJBS", sub:"Trumpington Street · today", x:95, y:46, star:true,
+    text:"The University's business school, founded in 1990. It lives in the old Addenbrooke's Hospital (1766), which John Outram turned into a riotously coloured 'temple' with red columns in 1995. In 1575 this spot was still fields beside the road to Trumpington." },
+  { id:"kings", name:"King's College", sub:"Founded 1441", x:63, y:61,
+    text:"Founded by Henry VI in 1441. The chapel took almost 70 years to build (1446–1515) and has the largest fan vault in the world. The famous choir sings Evensong most days at 17:30." },
+  { id:"trinity", name:"Trinity College", sub:"Founded 1546", x:48, y:63,
+    text:"Founded by Henry VIII in 1546 — just 29 years before this map was engraved. Newton, Byron and more than 30 Nobel laureates studied here." },
+  { id:"johns", name:"St John's College", sub:"Founded 1511", x:41, y:57,
+    text:"Founded under the will of Lady Margaret Beaufort, mother of Henry VII. The Bridge of Sighs isn't on the map yet — it arrives in 1831." },
+  { id:"round", name:"The Round Church", sub:"Holy Sepulchre · c. 1130", x:37.5, y:51.5,
+    text:"One of only four surviving medieval round churches in England. The engraver labelled it 'S. Pulchers'." },
+  { id:"market", name:"Market Square", sub:"Market Hill · Peas Hill", x:60, y:37,
+    text:"There has been a market here since the Middle Ages — and it still runs every day. A few steps away, by the 'Peass market', stands the Arts Theatre, founded by John Maynard Keynes in 1936." },
+  { id:"senate", name:"Great St Mary's & Senate House", sub:"The University Church", x:59, y:48,
+    text:"The University Church hosted ceremonies and debates until the Senate House was built in 1730; degrees are still conferred next door. Climb the 123 steps of the tower for a view over the whole city." },
+  { id:"corpus", name:"Corpus Christi College", sub:"Founded 1352", x:74, y:45,
+    text:"The only college founded by townspeople — two of the town's guilds. On the map it's 'Benet Coll'. Its Old Court is the oldest surviving court in Cambridge." },
+  { id:"queens", name:"Queens' College", sub:"Founded 1448", x:77, y:60,
+    text:"Founded twice, by two queens — Margaret of Anjou and Elizabeth Woodville — hence the apostrophe after the 's'. The Mathematical Bridge comes later, in 1749." },
+  { id:"peter", name:"Peterhouse", sub:"Founded 1284", x:89.5, y:57,
+    text:"The oldest college in Cambridge, founded by Hugh de Balsham, Bishop of Ely, in 1284. On the map it's simply 'Peter house'." },
+  { id:"christs", name:"Christ's College", sub:"Founded 1505", x:55, y:20,
+    text:"Refounded by Lady Margaret Beaufort in 1505. John Milton and Charles Darwin were both students here." },
+  { id:"jesus", name:"Jesus College", sub:"Founded 1496", x:34, y:26,
+    text:"Founded by Bishop John Alcock on the site of St Radegund's nunnery — which is why it still has a cloister and its own walled grounds." },
+  { id:"magdalene", name:"Magdalene College", sub:"Founded 1542", x:23, y:77,
+    text:"The only old college across the river. It holds the library of Samuel Pepys — famous diary included." },
+  { id:"castle", name:"Castle Mound", sub:"Built 1068", x:7.5, y:81,
+    text:"William the Conqueror's castle. By 1575 it was being quarried for stone to build the colleges; today only the mound remains — with the best view in town." },
+];
+
+// ===== Events (found online on 10 Sep 2026). Only those within the next 14 days are shown =====
+const EVENTS = [
+  { place:"kings",  date:"2026-09-11", title:"Cambridge College Open Day",
+    where:"Colleges across the University, 9:30–16:30", url:"https://www.undergraduate.study.cam.ac.uk/events/cambridge-open-days/programme" },
+  { place:"johns",  date:"2026-09-11", end:"2026-09-20", title:"Open Cambridge: treasures of St John's Old Library",
+    where:"St John's College · part of Heritage Open Days", url:"https://www.opencambridge.cam.ac.uk/" },
+  { place:"senate", date:"2026-09-11", end:"2026-09-20", title:"Open Cambridge: tours of the Senate House & University Library",
+    where:"Senate House and more · free, booking required", url:"https://www.cam.ac.uk/news/go-behind-the-scenes-at-cambridge-with-open-cambridge-2026" },
+  { place:"market", date:"2026-09-15", end:"2026-09-19", title:"Blood Brothers — the musical",
+    where:"Cambridge Arts Theatre", url:"https://www.visitcambridge.org/event/blood-brothers/" },
+  { place:"cjbs",   date:"2026-09-16", title:"Quiz Night @ Hot Numbers Trumpington Street",
+    where:"Hot Numbers, Trumpington St — across the road from CJBS, 19:00", url:"https://www.visitcambridge.org/event/quiz-night-hot-numbers-trumpington-street/" },
+  { place:"senate", date:"2026-09-18", end:"2026-09-20", title:"Cambridge Alumni Festival 2026",
+    where:"Lectures, panels and tours across collegiate Cambridge", url:"https://www.alumni.cam.ac.uk/festival" },
+  { place:"cjbs",   date:"2026-09-01", end:"2026-09-30", title:"CJBS Connects: Worldwide",
+    where:"Cambridge Judge alumni gatherings — in Cambridge and online", url:"https://www.jbs.cam.ac.uk/alumni/events/cjbs-connects-worldwide/" },
+];
+
+// ===== Logic =====
+const $ = s => document.querySelector(s);
+const map = $("#map"), walker = $("#walker"), card = $("#card"), target = $("#target");
+const iso = d => d.toISOString().slice(0,10);
+const today = new Date(); const TODAY = iso(today);
+const LIMIT = iso(new Date(today.getTime() + 14*864e5));
+const upcoming = EVENTS.filter(e => (e.end || e.date) >= TODAY && e.date <= LIMIT)
+                       .sort((a,b) => (a.date < TODAY ? TODAY : a.date).localeCompare(b.date < TODAY ? TODAY : b.date));
+const byId = Object.fromEntries(PLACES.map(p => [p.id, p]));
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const fmt = s => { const [,m,d] = s.split("-"); return `${+d} ${MONTHS[m-1]}`; };
+const when = e => e.end ? `${fmt(e.date)} – ${fmt(e.end)}` : fmt(e.date);
+
+// Place markers
+PLACES.forEach(p => {
+  const el = document.createElement("div");
+  el.className = "place" + (p.star ? " star" : "");
+  el.style.left = p.x + "%"; el.style.top = p.y + "%";
+  el.innerHTML = `<div class="dot"></div><div class="label">${p.star ? "★ " : ""}${p.short || p.name}</div>` +
+                 (upcoming.some(e => e.place === p.id) ? `<div class="ev"></div>` : "");
+  el.addEventListener("click", ev => { ev.stopPropagation(); walkTo(p.x, p.y); });
+  p.el = el; map.appendChild(el);
+});
+
+// Walking
+let pos = { x:40, y:78 }, arriveTimer, current = null;
+const ratio = () => map.clientHeight / map.clientWidth;          // so distance is measured in true proportions
+const dist = (a, b) => Math.hypot(a.x - b.x, (a.y - b.y) * ratio());
+
+function walkTo(x, y) {
+  $("#hint").style.opacity = 0;
+  closeCard();
+  const d = dist(pos, { x, y });
+  const ms = Math.max(250, d * 70);                                // speed: ~14% of map width per second
+  walker.style.transitionDuration = ms + "ms";
+  if (Math.abs(x - pos.x) > 0.3) walker.classList.toggle("flip", x > pos.x);  // 🚶 faces left — mirror it when walking right
+  walker.classList.add("walking");
+  walker.style.left = x + "%"; walker.style.top = y + "%";
+  target.style.left = x + "%"; target.style.top = y + "%"; target.style.opacity = 1;
+  pos = { x, y };
+  clearTimeout(arriveTimer);
+  arriveTimer = setTimeout(arrive, ms);
+}
+
+function arrive() {
+  walker.classList.remove("walking"); target.style.opacity = 0;
+  let best = null, bd = 4.5;                                       // "nearby" = within 4.5% of map width
+  PLACES.forEach(p => { const d = dist(pos, p); if (d < bd) { bd = d; best = p; } });
+  if (best) openCard(best);
+}
+
+function evHtml(e, withPlace) {
+  const tag = withPlace ? "div" : "a";
+  const attrs = withPlace ? `data-place="${e.place}"` : `href="${e.url}" target="_blank" rel="noopener"`;
+  return `<${tag} class="evt" ${attrs}><b>${when(e)}</b>${e.title}<small>${withPlace ? byId[e.place].name + " · " : ""}${e.where}</small></${tag}>`;
+}
+
+function openCard(p) {
+  current = p;
+  PLACES.forEach(q => q.el.classList.toggle("near", q === p));
+  const evs = upcoming.filter(e => e.place === p.id);
+  $("#cardBody").innerHTML = `<h2>${p.name}</h2><div class="sub">${p.sub}</div><p>${p.text}</p>` +
+    `<h3>Next two weeks</h3>` +
+    (evs.length ? evs.map(e => evHtml(e)).join("") : `<p class="sub">All quiet — nothing on here in the next 14 days.</p>`);
+  card.classList.add("open");
+  history.replaceState(null, "", "?at=" + p.id);
+}
+function closeCard() {
+  card.classList.remove("open"); current = null;
+  PLACES.forEach(q => q.el.classList.remove("near"));
+}
+card.querySelector(".close").onclick = closeCard;
+
+// Map click
+map.addEventListener("click", e => {
+  const r = map.getBoundingClientRect();
+  const x = +((e.clientX - r.left) / r.width * 100).toFixed(1);
+  const y = +((e.clientY - r.top) / r.height * 100).toFixed(1);
+  if (e.altKey) { console.log(`x: ${x}, y: ${y}`); return; }
+  $("#events").classList.remove("open");
+  walkTo(x, y);
+});
+
+// Events panel
+$("#evCount").textContent = upcoming.length;
+$("#events").innerHTML = `<h2>The next 14 days</h2><div class="sub" style="font-style:italic;opacity:.7;margin-bottom:6px">${fmt(TODAY)} – ${fmt(LIMIT)} · click to walk there</div>` +
+  (upcoming.length ? upcoming.map(e => evHtml(e, true)).join("") : "<p>Time to refresh the events list.</p>");
+$("#evBtn").onclick = () => $("#events").classList.toggle("open");
+$("#events").addEventListener("click", e => {
+  const it = e.target.closest("[data-place]"); if (!it) return;
+  const p = byId[it.dataset.place]; $("#events").classList.remove("open"); walkTo(p.x, p.y);
+});
+
+// ?at=kings — start at a place
+const at = new URLSearchParams(location.search).get("at");
+if (byId[at]) { const p = byId[at]; setTimeout(() => walkTo(p.x, p.y), 400); }
+</script>
 </body>
 </html>
