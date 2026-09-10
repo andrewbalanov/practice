@@ -70,6 +70,27 @@
     border-radius:4px; font-style:italic; transition:opacity 1s; max-width:calc(100vw - 180px); }
   #credit { position:fixed; right:8px; bottom:4px; font-size:11px; color:#f4e8ccaa; z-index:1; }
   #credit a { color:inherit; }
+
+  /* ---- 3D mode ---- */
+  #map { transition:transform .7s ease-in, opacity .7s ease-in, filter .7s; }
+  #map.zoom { transform:scale(4); opacity:0; filter:blur(3px); }
+  #view3d { position:fixed; inset:0; z-index:8; display:none; background:#e9dcbc; }
+  #view3d canvas { display:block; touch-action:none; cursor:grab; }
+  body.in3d #view3d { display:block; animation:fadein .6s; }
+  body.in3d #hint, body.in3d #credit { display:none; }
+  @keyframes fadein { from{opacity:0} to{opacity:1} }
+  #exit3d { position:absolute; top:12px; left:12px; font:inherit; font-size:17px; padding:6px 14px; cursor:pointer;
+    background:var(--paper); color:var(--ink); border:2px solid var(--ink); border-radius:4px; box-shadow:0 4px 14px #0006; }
+  #mini { position:absolute; left:12px; bottom:12px; width:min(220px, 36vw); aspect-ratio:1920/1427;
+    background:url(map.jpg) center/100% 100%; border:2px solid var(--ink); box-shadow:0 0 0 3px var(--paper), 0 0 0 5px var(--red), 0 6px 20px #0008; }
+  #miniDot { position:absolute; width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent;
+    border-bottom:16px solid var(--red); filter:drop-shadow(0 0 2px #fff); }
+  #keysHelp { position:absolute; left:50%; bottom:12px; transform:translateX(-50%); background:#f4e8cce6; border:1px solid var(--ink);
+    border-radius:4px; padding:4px 12px; font-style:italic; font-size:14px; white-space:nowrap; }
+  #pad { position:absolute; right:16px; bottom:16px; display:none; grid-template-columns:repeat(3, 52px); gap:6px; }
+  #pad button { height:52px; font-size:22px; border-radius:50%; border:2px solid var(--ink); background:#f4e8cce6; color:var(--ink); touch-action:none; }
+  @media (pointer:coarse) { #pad { display:grid; } }
+  @media (pointer:coarse), (max-width:1000px) { #keysHelp { display:none; } }
 </style>
 </head>
 <body>
@@ -80,11 +101,25 @@
   </div>
 </div>
 
-<div id="hint">Click anywhere on the map to take a stroll through Cambridge, 1575</div>
+<div id="view3d">
+  <button id="exit3d">🗺 Back to the map</button>
+  <div id="keysHelp">WASD / arrows to walk · drag to look · click the ground to go there · Shift to run · Esc for the map</div>
+  <div id="mini"><div id="miniDot"></div></div>
+  <div id="pad">
+    <span></span><button data-k="KeyW">▲</button><span></span>
+    <button data-k="ArrowLeft">↶</button><button data-k="KeyS">▼</button><button data-k="ArrowRight">↷</button>
+  </div>
+</div>
+
+<div id="hint">Click anywhere on the map to step into Cambridge, 1575 — in 3D</div>
 <button id="evBtn">Events <span class="n" id="evCount">0</span></button>
 <div id="events" class="panel"></div>
 <div id="card" class="panel"><button class="close" aria-label="Close">×</button><div id="cardBody"></div></div>
 <div id="credit">Map: Braun &amp; Hogenberg, <i>Cantebrigia</i>, 1575 · <a href="https://commons.wikimedia.org/wiki/File:Cambridge_by_Braun_Hogenberg_(110198041).jpg" target="_blank">Wikimedia Commons</a></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="map-data.js"></script>
+<script src="city3d.js"></script>
 
 <script>
 // ===== Places. Coordinates are % of the image (Alt+click on the map logs them to the console) =====
@@ -157,7 +192,7 @@ PLACES.forEach(p => {
   el.style.left = p.x + "%"; el.style.top = p.y + "%";
   el.innerHTML = `<div class="dot"></div><div class="label">${p.star ? "★ " : ""}${p.short || p.name}</div>` +
                  (upcoming.some(e => e.place === p.id) ? `<div class="ev"></div>` : "");
-  el.addEventListener("click", ev => { ev.stopPropagation(); walkTo(p.x, p.y); });
+  el.addEventListener("click", ev => { ev.stopPropagation(); go3d(p.x, p.y, p); });
   p.el = el; map.appendChild(el);
 });
 
@@ -217,8 +252,24 @@ map.addEventListener("click", e => {
   const y = +((e.clientY - r.top) / r.height * 100).toFixed(1);
   if (e.altKey) { console.log(`x: ${x}, y: ${y}`); return; }
   $("#events").classList.remove("open");
-  walkTo(x, y);
+  go3d(x, y);
 });
+
+// 3D: zoom into the engraving at the clicked point, then drop onto the street
+function go3d(x, y, place) {
+  $("#hint").style.opacity = 0;
+  $("#events").classList.remove("open");
+  if (City3D.active) { City3D.enter(x, y, place); return; }       // already in 3D — just teleport
+  closeCard();
+  walker.style.transitionDuration = "0ms"; walker.style.left = x + "%"; walker.style.top = y + "%"; pos = { x, y };
+  map.style.transformOrigin = `${x}% ${y}%`;
+  map.classList.add("zoom");
+  setTimeout(() => City3D.enter(x, y, place), 650);
+}
+City3D.onExit = (x, y) => {                                          // back on the map where you stopped walking
+  map.classList.remove("zoom");
+  walker.style.transitionDuration = "0ms"; walker.style.left = x + "%"; walker.style.top = y + "%"; pos = { x, y };
+};
 
 // Events panel
 $("#evCount").textContent = upcoming.length;
@@ -227,7 +278,7 @@ $("#events").innerHTML = `<h2>The next 14 days</h2><div class="sub" style="font-
 $("#evBtn").onclick = () => $("#events").classList.toggle("open");
 $("#events").addEventListener("click", e => {
   const it = e.target.closest("[data-place]"); if (!it) return;
-  const p = byId[it.dataset.place]; $("#events").classList.remove("open"); walkTo(p.x, p.y);
+  const p = byId[it.dataset.place]; go3d(p.x, p.y, p);
 });
 
 // ?at=kings — start at a place
